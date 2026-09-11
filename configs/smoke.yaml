@@ -1,0 +1,19 @@
+# Synthetic-fixture smoke test. Not a research config: tiny images, random
+# init, 2 epochs. Exists to prove the pipeline runs end to end on a machine
+# with no GPU and no dataset access.
+split_csv: data/splits_smoke/ham_balanced.csv
+classes: [nv, mel, bkl, bcc, akiec, vasc, df]
+model: resnet18
+pretrained: false
+image_size: 64
+batch_size: 8
+epochs: 2
+lr: 0.0003
+weight_decay: 0.01
+seed: 42
+num_workers: 0
+color_mode: raw
+imbalance: none
+label_smoothing: 0.1
+amp: false
+results_dir: results/smoke

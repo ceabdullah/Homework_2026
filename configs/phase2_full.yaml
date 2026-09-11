@@ -1,0 +1,17 @@
+# Phase 2 -- full HAM10000 baseline. batch_size 48 fits 224px on a 12 GB
+# 3080 Ti; drop to 24 if VRAM is tight rather than reducing resolution.
+split_csv: data/splits/ham_full.csv
+classes: [nv, mel, bkl, bcc, akiec, vasc, df]
+model: resnet50
+pretrained: true
+image_size: 224
+batch_size: 48
+epochs: 40
+lr: 0.0003
+weight_decay: 0.01
+seed: 42
+num_workers: 4
+color_mode: raw
+imbalance: none
+label_smoothing: 0.1
+amp: true

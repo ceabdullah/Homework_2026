@@ -1,0 +1,20 @@
+# Raw data is never modified and never committed.
+data/raw/
+data/processed/
+data/synthetic/
+
+# Run artifacts: keep the small, quotable ones, drop the heavy ones.
+results/**/*.pt
+results/**/*.npz
+results/**/*.pth
+results/smoke/
+
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
+data/splits_smoke/
+
+!.gitkeep

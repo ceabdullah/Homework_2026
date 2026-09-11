@@ -1,0 +1,18 @@
+# Phase 3 -- source model in the shared 4-class label space, so the target
+# domain can be scored with the same head. Classes are ordered identically
+# to SHARED_CLASSES in src/data/build_splits.py; do not reorder.
+split_csv: data/splits/ham_shared4.csv
+classes: [bcc, mel, akiec, nv]
+model: resnet50
+pretrained: true
+image_size: 224
+batch_size: 48
+epochs: 40
+lr: 0.0003
+weight_decay: 0.01
+seed: 42
+num_workers: 4
+color_mode: raw
+imbalance: class_weighted
+label_smoothing: 0.1
+amp: true

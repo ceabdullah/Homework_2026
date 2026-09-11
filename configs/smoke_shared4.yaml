@@ -1,0 +1,17 @@
+# Synthetic-fixture smoke test, shared 4-class source model (Phase 3 shape).
+split_csv: data/splits_smoke/ham_shared4.csv
+classes: [bcc, mel, akiec, nv]
+model: resnet18
+pretrained: false
+image_size: 64
+batch_size: 8
+epochs: 3
+lr: 0.0005
+weight_decay: 0.01
+seed: 42
+num_workers: 0
+color_mode: raw
+imbalance: class_weighted
+label_smoothing: 0.1
+amp: false
+results_dir: results/smoke

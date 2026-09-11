@@ -1,0 +1,17 @@
+# Phase 1 -- balanced pilot. Purpose: surface bugs in two minutes, not two
+# hours. Do NOT tune for accuracy here.
+split_csv: data/splits/ham_balanced.csv
+classes: [nv, mel, bkl, bcc, akiec, vasc, df]
+model: resnet50
+pretrained: true
+image_size: 224
+batch_size: 32
+epochs: 30
+lr: 0.0003
+weight_decay: 0.01
+seed: 42
+num_workers: 4
+color_mode: raw
+imbalance: none
+label_smoothing: 0.1
+amp: true
