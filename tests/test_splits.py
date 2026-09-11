@@ -81,6 +81,36 @@ def test_grayscale_keeps_three_channels():
     assert (g[..., 0] == g[..., 1]).all() and (g[..., 1] == g[..., 2]).all()
 
 
+def test_pad_style_lesion_ids_do_not_merge_patients():
+    """Regression: PAD-UFES-20's docs never state whether lesion_id is
+    unique across patients. If it is numbered within a patient, grouping by
+    it alone merges unrelated lesions -- and assert_no_leak still passes,
+    because the groups are internally consistent. The split looks clean and
+    leaks anyway. load_pad() therefore groups by patient_id + lesion_id."""
+    rows = []
+    for patient in range(40):
+        for lesion in (1, 2):                 # per-patient numbering
+            for k in range(2):
+                rows.append({"image_id": f"P{patient}_L{lesion}_{k}",
+                             "path": f"/tmp/P{patient}_L{lesion}_{k}.png",
+                             "label": ["bcc", "mel", "akiec", "nv"][patient % 4],
+                             "patient_id": f"P{patient}",
+                             "lesion_id": str(lesion)})
+    df = pd.DataFrame(rows)
+
+    naive = df.assign(group=df["lesion_id"])
+    assert naive["group"].nunique() == 2, "bare lesion_id should collapse to 2 groups"
+
+    composite = df.assign(group=df["patient_id"] + "_" + df["lesion_id"])
+    assert composite["group"].nunique() == 80, composite["group"].nunique()
+
+    out = grouped_split(composite)
+    assert_no_leak(out, "pad_composite")
+    # and no patient's images for one lesion are scattered across splits
+    per = out.groupby(["patient_id", "lesion_id"])["split"].nunique()
+    assert (per == 1).all()
+
+
 if __name__ == "__main__":
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
     for fn in fns:

@@ -67,6 +67,53 @@ export, all five figures, summary table.
 
 ---
 
+## 2026-09-11 — PAD-UFES-20 schema verified from a reachable source
+
+Mendeley and arxiv are blocked, but `raw.githubusercontent.com` is not, and the
+dataset authors publish their own exploratory notebook. Fetched
+`labcin-ufes/PAD-UFES-20 : analysis/pad-ufes-20-analysis.ipynb` and read the
+schema out of its executed output cells.
+
+**Verified:** columns `patient_id, lesion_id, smoke, drink, background_father,
+background_mother, age, pesticide, gender, skin_cancer_history, diameter_1,
+diameter_2, diagnostic, itch, grew, hurt, changed, bleed, elevation, img_id,
+biopsed`; counts BCC 845 / ACK 730 / NEV 244 / SEK 235 / SCC 192 / MEL 52,
+total 2298; 1373 patients, 1641 lesions; `.png`; `img_id` carries the
+extension (`PAT_1516_1765_530.png`).
+
+This corrected two things I had wrong from memory:
+
+1. **`verify_pad()` required `region`, `age` and `biopsed`.** The verified
+   column list does not include `region`, and the notebook's list is 21 of the
+   paper's 26 features. Asserting on optional fields would have aborted the
+   download on a legitimate release. Required set narrowed to the four columns
+   `load_pad()` actually indexes by name; the rest are reported when absent,
+   never fatal.
+
+2. **`load_pad()` grouped by bare `lesion_id`.** No source — the paper, the
+   README, the notebook, or the Mendeley page — states whether `lesion_id` is
+   unique across patients or numbered within a patient. If it is per-patient,
+   grouping by it merges unrelated lesions, **and `assert_no_leak` still
+   passes**, because the merged groups are internally consistent. That is the
+   worst failure mode available: a split that looks clean and leaks. Now
+   grouped by `patient_id + "_" + lesion_id`, which is identical under the
+   optimistic reading and correct under the pessimistic one. Added
+   `--pad-group-by patient` for the stricter sensitivity check.
+
+The synthetic fixture now numbers `lesion_id` within a patient (the pessimistic
+reading), so the composite key is exercised rather than assumed, and
+`test_pad_style_lesion_ids_do_not_merge_patients` pins the behaviour: bare
+`lesion_id` collapses 80 lesions to 2 groups, the composite keeps 80.
+`verify_pad()` also now prints which reading the real file supports — run it
+and record the answer here.
+
+**Still unverified:** HAM10000's exact column names. The `ptschandl/HAM10000_dataset`
+README does not list them and the Dataverse/ISIC hosts are blocked.
+`verify_ham()` asserts row count (10015) and the exact class distribution, which
+will catch a wrong file regardless.
+
+---
+
 ## <date> — Phase 0 on the workstation
 
 - [ ] `python -m src.data.download` output pasted here, PAD source named

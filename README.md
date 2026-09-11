@@ -47,6 +47,24 @@ export PYTHONPATH=$PWD          # every entrypoint is run as `python -m src.…`
 | HAM10000 | Kaggle `kmader/skin-cancer-mnist-ham10000` (orig. Harvard Dataverse `10.7910/DVN/DBW86T`) | 10015 images, 7 classes |
 | PAD-UFES-20 | **Mendeley Data `10.17632/zr7vgbcyr2.1`** | 2298 images, 1641 lesions, 1373 patients, 6 classes, `.png` |
 
+PAD-UFES-20's schema is verified against the dataset authors' own analysis
+notebook ([labcin-ufes/PAD-UFES-20](https://github.com/labcin-ufes/PAD-UFES-20),
+`analysis/pad-ufes-20-analysis.ipynb`): columns `patient_id, lesion_id, smoke,
+drink, background_father, background_mother, age, pesticide, gender,
+skin_cancer_history, diameter_1, diameter_2, diagnostic, itch, grew, hurt,
+changed, bleed, elevation, img_id, biopsed`; class counts BCC 845, ACK 730,
+NEV 244, SEK 235, SCC 192, MEL 52. `img_id` includes the file extension
+(`PAT_1516_1765_530.png`), so it is matched on `Path.name`, not `Path.stem`.
+
+**Grouping.** The published documentation never states whether `lesion_id` is
+unique across patients or numbered within one. `load_pad()` therefore groups by
+`patient_id + "_" + lesion_id` — identical if the id is globally unique, correct
+if it is not. Grouping by bare `lesion_id` in the second case merges different
+patients' lesions into one group, and `assert_no_leak` still passes, because the
+merged groups are internally consistent: the split looks clean and leaks anyway.
+`--pad-group-by patient` is the stricter sensitivity check (same skin, camera and
+lighting recur across one patient's lesions).
+
 ```bash
 python -m src.data.download --pad-source mendeley    # default; canonical
 python -m src.data.download --pad-source kaggle      # mirror, schema unverified

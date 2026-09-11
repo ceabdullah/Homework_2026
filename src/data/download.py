@@ -39,9 +39,23 @@ HAM_EXPECTED = {"nv": 6705, "mel": 1113, "bkl": 1099, "bcc": 514,
                 "akiec": 327, "vasc": 142, "df": 115}
 HAM_EXPECTED_ROWS = 10015
 
+# Verified against the dataset authors' analysis notebook
+# (labcin-ufes/PAD-UFES-20, analysis/pad-ufes-20-analysis.ipynb).
 PAD_EXPECTED = {"BCC": 845, "ACK": 730, "NEV": 244, "SEK": 235, "SCC": 192, "MEL": 52}
 PAD_EXPECTED_ROWS = 2298
-PAD_REQUIRED_COLS = ["patient_id", "lesion_id", "img_id", "diagnostic", "age", "region", "biopsed"]
+PAD_EXPECTED_LESIONS = 1641
+PAD_EXPECTED_PATIENTS = 1373
+
+# Only what load_pad() actually indexes by name. Asserting on the full 26
+# columns would reject a legitimate release over an optional field.
+PAD_REQUIRED_COLS = ["patient_id", "lesion_id", "img_id", "diagnostic"]
+
+# Present in the published release; reported when absent, never fatal.
+PAD_OPTIONAL_COLS = ["age", "gender", "region", "biopsed", "fitspatrick",
+                     "diameter_1", "diameter_2", "itch", "grew", "hurt",
+                     "changed", "bleed", "elevation", "smoke", "drink",
+                     "pesticide", "skin_cancer_history", "cancer_history",
+                     "background_father", "background_mother"]
 
 
 def _run(cmd: list[str]) -> None:
@@ -116,11 +130,27 @@ def verify_pad(root: Path) -> None:
         f"This mirror has a different schema -- adapt load_pad() in "
         f"src/data/build_splits.py and record the change."
     )
+    absent = [c for c in PAD_OPTIONAL_COLS if c not in meta.columns]
+    if absent:
+        print(f"[info] optional columns not in this release: {absent}")
+
     counts = meta["diagnostic"].value_counts().to_dict()
     n_img = sum(1 for _ in root.rglob("*.png")) + sum(1 for _ in root.rglob("*.jpg"))
-    print(f"[ok] PAD-UFES-20: {len(meta)} rows, {meta['lesion_id'].nunique()} lesions, "
-          f"{meta['patient_id'].nunique()} patients, {n_img} image files")
+    composite = (meta["patient_id"].astype(str) + "_" + meta["lesion_id"].astype(str)).nunique()
+    print(f"[ok] PAD-UFES-20: {len(meta)} rows, {meta['patient_id'].nunique()} patients, "
+          f"{meta['lesion_id'].nunique()} raw lesion_ids, {composite} patient+lesion "
+          f"groups, {n_img} image files")
     print(pd.Series(counts).to_string())
+
+    # The one fact the published docs never state. build_splits.py groups by
+    # the composite key either way; this says which assumption holds, so the
+    # choice is defensible rather than lucky.
+    if meta["lesion_id"].nunique() < composite:
+        print("[IMPORTANT] lesion_id is NOT unique across patients. Grouping by "
+              "lesion_id alone would merge different patients' lesions and leak.")
+    else:
+        print("[ok] lesion_id appears globally unique in this release.")
+
     if len(meta) != PAD_EXPECTED_ROWS or counts != PAD_EXPECTED:
         print(f"[WARN] differs from the published PAD-UFES-20 "
               f"({PAD_EXPECTED_ROWS} rows, {PAD_EXPECTED}).")

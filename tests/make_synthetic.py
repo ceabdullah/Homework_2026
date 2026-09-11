@@ -76,10 +76,14 @@ def build_pad(root: Path, n_lesions: int, size: int, seed: int) -> None:
     for li in range(n_lesions):
         dx = rng.choice(PAD_CLASSES, p=[PAD_SHARE[c] for c in PAD_CLASSES])
         hue = CLASS_HUE[PAD_TO_HAM_HUE[dx]]
+        # lesion_id is numbered WITHIN a patient here, the pessimistic
+        # reading of the real dataset (whose docs never state which it is).
+        # Grouping by bare lesion_id therefore merges two different
+        # patients' lesions -- exactly the leak the composite key prevents.
         patient_id = f"PAT_{li // 2}"
-        lesion_id = f"{li}"
+        lesion_id = f"{li % 2 + 1}"
         for k in range(1 if rng.rand() > 0.4 else rng.randint(2, 4)):
-            img_id = f"PAT_{li // 2}_{li}_{k}.png"
+            img_id = f"{patient_id}_{lesion_id}_{li}{k}.png"
             # Warm smartphone cast + lower effective sharpness: the domain gap.
             _lesion_image(rng, hue, size, (1.12, 0.98, 0.88)).save(img_dir / img_id)
             rows.append({"patient_id": patient_id, "lesion_id": lesion_id, "img_id": img_id,

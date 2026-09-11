@@ -74,13 +74,36 @@ def load_ham(root: Path = RAW / "ham10000") -> pd.DataFrame:
     return meta[cols].reset_index(drop=True)
 
 
-def load_pad(root: Path = RAW / "pad_ufes_20", include_sek: bool = False) -> pd.DataFrame:
+def load_pad(root: Path = RAW / "pad_ufes_20", include_sek: bool = False,
+             group_by: str = "lesion") -> pd.DataFrame:
     """PAD-UFES-20 loader.
 
-    Expected schema (Mendeley 10.17632/zr7vgbcyr2.1): 26 columns including
-    patient_id, lesion_id, img_id, diagnostic, age, region, biopsed.
-    Images are .png. If a mirror differs, adapt HERE and report the change --
-    do not silently rename columns elsewhere.
+    Schema verified against the dataset authors' own analysis notebook
+    (labcin-ufes/PAD-UFES-20, analysis/pad-ufes-20-analysis.ipynb):
+
+        patient_id, lesion_id, smoke, drink, background_father,
+        background_mother, age, pesticide, gender, skin_cancer_history,
+        diameter_1, diameter_2, diagnostic, itch, grew, hurt, changed,
+        bleed, elevation, img_id, biopsed
+
+    img_id carries the file extension ("PAT_1516_1765_530.png"), so it is
+    matched against Path.name, not Path.stem. Images are .png.
+    1373 patients / 1641 lesions / 2298 images.
+
+    group_by:
+      "lesion"  -- patient_id + lesion_id, the composite key. The published
+                   documentation does NOT state whether lesion_id is unique
+                   across patients or numbered within a patient. The
+                   composite is identical to lesion_id if it is globally
+                   unique, and correct if it is not; bare lesion_id would
+                   silently merge different patients' lesions into one
+                   group and hand you a leak-free-looking split that leaks.
+      "patient" -- group every lesion of a patient together. Stricter: the
+                   same skin, camera and lighting recur across a patient's
+                   lesions. Use it as a sensitivity check.
+
+    If a mirror differs, adapt HERE and report the change -- do not
+    silently rename columns elsewhere.
     """
     meta = pd.read_csv(_find(root, "metadata.csv"))
     required = {"img_id", "diagnostic", "lesion_id", "patient_id"}
@@ -106,9 +129,21 @@ def load_pad(root: Path = RAW / "pad_ufes_20", include_sek: bool = False) -> pd.
         print(f"[info] {dropped} PAD rows dropped (unmapped diagnoses): {kept}")
     meta = meta.dropna(subset=["label"])
 
-    # Group by lesion. PAD photographs a lesion several times, same hazard
-    # as HAM10000.
-    meta["group"] = meta["lesion_id"].astype(str)
+    # PAD photographs a lesion several times, same hazard as HAM10000.
+    pid = meta["patient_id"].astype(str)
+    lid = meta["lesion_id"].astype(str)
+    if group_by == "patient":
+        meta["group"] = pid
+    elif group_by == "lesion":
+        meta["group"] = pid + "_" + lid
+        # Diagnostic, not an assertion: says which assumption the data
+        # actually supports, so the choice can be defended in the write-up.
+        if lid.nunique() < meta["group"].nunique():
+            print(f"[info] PAD lesion_id is NOT unique across patients "
+                  f"({lid.nunique()} raw ids vs {meta['group'].nunique()} "
+                  f"patient+lesion groups) -- grouping by the composite key")
+    else:
+        raise ValueError(f"group_by must be 'lesion' or 'patient', got {group_by!r}")
     meta["dataset"] = "pad_ufes_20"
     meta = meta.rename(columns={"img_id": "image_id"})
     cols = ["image_id", "path", "label", "group", "dataset"]
@@ -208,6 +243,8 @@ def main() -> None:
     ap.add_argument("--include-sek", action="store_true",
                     help="add PAD SEK -> HAM bkl as a 5th shared class (sensitivity check)")
     ap.add_argument("--seed", type=int, default=SEED)
+    ap.add_argument("--pad-group-by", choices=["lesion", "patient"], default="lesion",
+                    help="'patient' is the stricter sensitivity check")
     a = ap.parse_args()
 
     out_dir = Path(a.out)
@@ -216,7 +253,8 @@ def main() -> None:
     suffix = "5" if a.include_sek else "4"
 
     ham = load_ham(Path(a.ham_root))
-    pad = load_pad(Path(a.pad_root), include_sek=a.include_sek)
+    pad = load_pad(Path(a.pad_root), include_sek=a.include_sek,
+                   group_by=a.pad_group_by)
 
     # Phase 1 -- balanced pilot.
     bal = grouped_split(build_balanced(ham, seed=a.seed), seed=a.seed)
