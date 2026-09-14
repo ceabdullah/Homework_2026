@@ -32,13 +32,60 @@ These are enforced by the code, not by discipline.
 
 ---
 
-## Setup
+## Quickstart
 
-```bash
+Everything is run from the repository root, as `python -m src.…`.
+
+```powershell
+# Windows 11 + RTX 3080 Ti
+git clone https://github.com/ceabdullah/Homework_2026
+cd Homework_2026
+git checkout claude/cross-domain-lesion-classification-uzye51
+
 pip install torch==2.5.1 torchvision==0.20.1 --index-url https://download.pytorch.org/whl/cu124
 pip install -r requirements.txt
-export PYTHONPATH=$PWD          # every entrypoint is run as `python -m src.…`
+
+python scripts\check_env.py          # <- run this FIRST
 ```
+
+`check_env.py` is a preflight check. It verifies Python, every import, CUDA and
+your VRAM, that ImageNet weights are actually reachable, Kaggle credentials and
+free disk — and prints the exact fix for anything missing. It exits non-zero
+until you are ready, so you find problems in ten seconds rather than forty
+minutes into a training run.
+
+Once it passes:
+
+```powershell
+python -m src.data.download           # ~10 GB, both datasets
+python -m src.data.build_splits       # writes data/splits/*.csv, once
+
+.\scripts\run_phase1.ps1              # balanced pilot, 3 seeds
+.\scripts\run_phase2.ps1              # full HAM10000, 12 runs, ~6 h
+.\scripts\run_phase3.ps1              # cross-domain
+```
+
+Linux/macOS/WSL: identical, with `bash scripts/run_phase1.sh` and
+`export PYTHONPATH=$PWD`.
+
+**Want to see it work before downloading anything?**
+
+```bash
+python tests/test_splits.py      # 8 unit tests, no pytest needed
+bash tests/smoke_test.sh         # whole pipeline on synthetic data, CPU-only
+```
+
+The smoke test fabricates both datasets, then runs splits → training →
+zero-shot → ablation → recovery curve → error export → figures → summary. It
+proves the pipeline is *wired*; the fixture numbers themselves mean nothing.
+
+## Stop after Phase 1
+
+Phase 1's deliverable is not accuracy. It is the **standard deviation of test
+macro-F1 across the three seeds** — your noise floor. `run_phase1` prints it and
+says so. If it exceeds 0.05, raise epochs or seeds before going further: no
+effect you claim in Phase 3 can be smaller than that number, and finding this
+out after Phase 2's six hours is an expensive way to learn it.
 
 ## Data
 
@@ -175,9 +222,10 @@ configs/          one YAML per phase (+ smoke configs)
 data/raw/         downloaded, never modified, never committed
 data/splits/      committed CSVs — the source of truth for every run
 src/data/         download.py, build_splits.py, datasets.py
-src/              preprocessing.py, models.py, train.py, cross_domain.py, summarize.py
+src/              preprocessing.py, models.py, train.py, cross_domain.py,
+                  zero_shot_all.py, summarize.py
 src/analysis/     error_analysis.py, figures.py
-scripts/          run_phase{1,2,3}.sh
+scripts/          check_env.py (preflight), run_phase{1,2,3}.{sh,ps1}
 tests/            unit tests + synthetic-fixture smoke test
 results/<run_id>/ config.yaml, environment.json, metrics.json, best.pt, predictions
 ```

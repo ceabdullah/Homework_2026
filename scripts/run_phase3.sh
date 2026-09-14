@@ -25,17 +25,8 @@ for cm in shades_of_gray grayscale; do
   done
 done
 
-# 3. zero-shot every source run onto PAD; summarize prints the gap column
-python3 - <<'PY'
-import subprocess, yaml
-from pathlib import Path
-for cfg in sorted(Path("results").glob("*/config.yaml")):
-    c = yaml.safe_load(open(cfg))
-    if "shared4" not in c["split_csv"]:
-        continue
-    subprocess.run(["python3", "-m", "src.cross_domain", "--run_id", cfg.parent.name,
-                    "--mode", "zero_shot"], check=True)
-PY
+# 3. zero-shot every shared-label-space run onto PAD
+python3 -m src.zero_shot_all
 
 python3 -m src.summarize --csv results/phase3_summary.csv
 echo
